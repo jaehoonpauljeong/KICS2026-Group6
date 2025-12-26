@@ -147,10 +147,41 @@ def measure_throughput_iperf(host, dst, port, duration=4):
     print(">>> iperf parsing failed:", out)
     return None
 
+def ssh_cmd(host, dst, cmd):
+    """
+    Run command on dst via SSH from host
+    """
+    return host.cmd(
+        f"ssh -o StrictHostKeyChecking=no "
+        f"-o UserKnownHostsFile=/dev/null "
+        f"{dst} '{cmd}'"
+    )
 
 def start_iperf_load(client):
     """background load using port 5202"""
     client.cmd(f"iperf3 -c {SERVER_VPN_IP} -p 5202 -b 30M -t 20 -O 1 >/dev/null 2>&1 &")
+
+def measure_throughput_ssh_iperf(host, dst_ip, port, duration=4):
+    """
+    Measure effective SSH throughput by running iperf3 over SSH
+    """
+    # start iperf server over SSH
+    ssh_cmd(host, dst_ip, f"iperf3 -s -p {port} -1")
+
+    # run iperf client locally
+    out = host.cmd(
+        f"iperf3 -c {dst_ip} -p {port} -t {duration} -f m"
+    )
+
+    m = re.search(r"receiver.*?([\d.]+)\s+Mbits/sec", out, re.S)
+    if not m:
+        m = re.search(r"sender.*?([\d.]+)\s+Mbits/sec", out, re.S)
+    if m:
+        return float(m.group(1))
+
+    print(">>> SSH iperf parsing failed:", out)
+    return None
+
 
 
 # ===============================
@@ -169,7 +200,7 @@ def run_scenario(net, vpn_nodes, server_pub):
     # Always measure Direct first
     # ---------------------------
     direct_latency = measure_latency_ping(h1, SERVER_UNDERLAY_IP)
-    direct_thr     = measure_throughput_iperf(h1, SERVER_UNDERLAY_IP, 5203)
+    direct_thr     = measure_throughput_ssh_iperf(h1, SERVER_UNDERLAY_IP, 5203)
 
     # ---------------------------
     # If VPN disabled (0 nodes)
@@ -208,7 +239,7 @@ def run_scenario(net, vpn_nodes, server_pub):
     # Measure VPN latency & throughput
     # ---------------------------
     vpn_latency = measure_latency_ping(h1, SERVER_VPN_IP)
-    vpn_thr     = measure_throughput_iperf(h1, SERVER_VPN_IP, 5201)
+    vpn_thr     = measure_throughput_ssh_iperf(h1, SERVER_VPN_IP, 5201)
 
     # ---------------------------
     # 출력

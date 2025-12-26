@@ -135,18 +135,6 @@ def measure_latency_ping(host, dst, count=5):
     return None
 
 
-def measure_throughput_iperf(host, dst, port, duration=4):
-    out = host.cmd(f"iperf3 -c {dst} -p {port} -t {duration} -f m")
-
-    m = re.search(r"receiver.*?([\d.]+)\s+Mbits/sec", out, re.S)
-    if not m:
-        m = re.search(r"sender.*?([\d.]+)\s+Mbits/sec", out, re.S)
-    if m:
-        return float(m.group(1))
-
-    print(">>> iperf parsing failed:", out)
-    return None
-
 def ssh_cmd(host, dst, cmd):
     """
     Run command on dst via SSH from host
@@ -231,8 +219,6 @@ def run_scenario(net, vpn_nodes, server_pub):
     load_nodes = [n for n in vpn_nodes if n != "h1"]
     for n in load_nodes:
         start_iperf_load(net.get(n))
-
-    #print("부하 발생:", load_nodes)
     time.sleep(3)
 
     # ---------------------------
@@ -242,7 +228,7 @@ def run_scenario(net, vpn_nodes, server_pub):
     vpn_thr     = measure_throughput_ssh_iperf(h1, SERVER_VPN_IP, 5201)
 
     # ---------------------------
-    # 출력
+    # Output
     # ---------------------------
     #print(f"Direct latency    = {direct_latency:.6f} sec")
     #print(f"Direct throughput = {direct_thr:.2f} Mbit/s")
@@ -377,29 +363,6 @@ def main():
             csv_file.flush()
             time.sleep(1)
 
-
-
-    """
-    print("\n======= SUMMARY =======")
-    for nodes, r in zip(scenarios, results):
-        print(f"[{len(nodes)} VPN nodes] {r}")
-
-        print("\n======= WEIGHTED AVERAGE (weight = #VPN nodes) =======")
-
-        w_direct_lat = weighted_avg(direct_lat_list, weights)
-        w_direct_thr = weighted_avg(direct_thr_list, weights)
-        w_vpn_lat    = weighted_avg(vpn_lat_list, weights)
-        w_vpn_thr    = weighted_avg(vpn_thr_list, weights)
-
-        if w_direct_lat is not None:
-            print(f"Weighted Direct latency    = {w_direct_lat:.6f} sec")
-        if w_direct_thr is not None:
-            print(f"Weighted Direct throughput = {w_direct_thr:.2f} Mbit/s")
-        if w_vpn_lat is not None:
-            print(f"Weighted VPN latency       = {w_vpn_lat:.6f} sec")
-        if w_vpn_thr is not None:
-            print(f"Weighted VPN throughput    = {w_vpn_thr:.2f} Mbit/s")
-    """
 
     csv_file.close()
     print(f"\n[+] Results saved to {csv_path}\n")
